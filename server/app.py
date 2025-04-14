@@ -25,5 +25,69 @@ def index():
     return "<h1>Code challenge</h1>"
 
 
+# GET /restaurants
+class Restaurants(Resource):
+    def get(self):
+        restaurants = Restaurant.query.all()
+        return [r.to_dict() for r in restaurants], 200
+
+
+# GET /restaurants/<int:id> and DELETE /restaurants/<int:id>
+class RestaurantByID(Resource):
+    def get(self, id):
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        if not restaurant:
+            return {"error": "Restaurant not found"}, 404
+        return restaurant.to_dict(rules=('restaurant_pizzas',)), 200
+
+    def delete(self, id):
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        if not restaurant:
+            return {"error": "Restaurant not found"}, 404
+
+        db.session.delete(restaurant)
+        db.session.commit()
+        return '', 204
+
+
+# GET /pizzas
+class Pizzas(Resource):
+    def get(self):
+        pizzas = Pizza.query.all()
+        return [p.to_dict() for p in pizzas], 200
+
+
+# POST /restaurant_pizzas
+class RestaurantPizzas(Resource):
+    def post(self):
+        data = request.get_json()
+
+        try:
+            price = data["price"]
+            pizza_id = data["pizza_id"]
+            restaurant_id = data["restaurant_id"]
+
+            new_rp = RestaurantPizza(
+                price=price,
+                pizza_id=pizza_id,
+                restaurant_id=restaurant_id
+            )
+
+            db.session.add(new_rp)
+            db.session.commit()
+
+            return new_rp.to_dict(rules=('restaurant', 'pizza')), 201
+
+        except (KeyError, ValueError, IntegrityError) as e:
+            db.session.rollback()
+            return {"errors": ["validation errors"]}, 400
+
+
+# Attach resources to endpoints
+api.add_resource(Restaurants, "/restaurants")
+api.add_resource(RestaurantByID, "/restaurants/<int:id>")
+api.add_resource(Pizzas, "/pizzas")
+api.add_resource(RestaurantPizzas, "/restaurant_pizzas")
+
 if __name__ == "__main__":
     app.run(port=5555, debug=True)
